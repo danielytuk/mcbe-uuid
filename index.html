@@ -622,197 +622,172 @@
         </div>
 
         <script>
-            document.addEventListener("DOMContentLoaded", function () {
-                const fileInput = document.getElementById("addon-file");
-                const fileNameDisplay = document.getElementById("file-name");
-                const generateBtn = document.getElementById("generate-uuids");
-                const outputSection = document.getElementById("output-section");
-                const output = document.getElementById("output");
-                const uuidDisplay = document.getElementById("uuid-display");
-                const progressBar = document.getElementById("progress-bar");
-                const progressFill = document.getElementById("progress-fill");
+document.addEventListener("DOMContentLoaded", () => {
+    const fileInput = document.getElementById("addon-file");
+    const fileNameDisplay = document.getElementById("file-name");
+    const generateBtn = document.getElementById("generate-uuids");
+    const outputSection = document.getElementById("output-section");
+    const output = document.getElementById("output");
+    const uuidDisplay = document.getElementById("uuid-display");
+    const progressBar = document.getElementById("progress-bar");
+    const progressFill = document.getElementById("progress-fill");
 
-                // Update filename display when file is selected
-                fileInput.addEventListener("change", function () {
-                    if (this.files.length > 0) {
-                        fileNameDisplay.textContent = `Selected: ${this.files[0].name}`;
-                    } else {
-                        fileNameDisplay.textContent = "";
-                    }
-                });
+    // --- Helper functions ---
+    const showError = message => {
+        outputSection.classList.add("active");
+        output.innerHTML = `<div class="error">❌ ${message}</div>`;
+        progressBar.classList.remove("active");
+    };
 
-                generateBtn.addEventListener("click", async () => {
-                    const file = fileInput.files[0];
+    const makeUuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+    });
 
-                    // Reset UI
-                    outputSection.classList.remove("active");
-                    uuidDisplay.innerHTML = "";
-                    output.innerHTML = "";
-                    progressBar.classList.add("active");
-                    progressFill.style.width = "0%";
+    const download = (blob, filename) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
 
-                    if (!file) {
-                        showError("Please select a .mcaddon file first!");
-                        return;
-                    }
+    const findAllManifests = async zip => {
+        const list = Object.keys(zip.files).filter(p => p.toLowerCase().endsWith("manifest.json"));
+        return Promise.all(list.map(async p => {
+            try {
+                const content = await zip.file(p).async("string");
+                return { path: p, content };
+            } catch { return null; }
+        })).then(arr => arr.filter(Boolean));
+    };
 
-                    try {
-                        // Show processing state
-                        progressFill.style.width = "30%";
-                        outputSection.classList.add("active");
-                        output.innerHTML = `
-                        <div class="success">
-                            <span class="status-icon">⛏️</span> Processing your addon file...
-                            <ul class="processing-steps">
-                                <li>Opening the addon package</li>
-                                <li>Locating manifest files</li>
-                                <li>Generating new unique IDs</li>
-                                <li>Preparing download</li>
-                            </ul>
-                        </div>`;
+    const classifyManifest = json => {
+        if (!json.modules) return "unknown";
+        for (let m of json.modules) {
+            if (m.type === "resources") return "resource";
+            if (m.type === "script" || m.type === "data") return "behavior";
+        }
+        return "unknown";
+    };
 
-                        const zip = await JSZip.loadAsync(file);
-                        progressFill.style.width = "50%";
+    const updateManifest = (json, uuidMap) => {
+        // Append "- Patch" to pack name
+        if (json.header && typeof json.header.name === "string" && !json.header.name.endsWith(" - Patch")) {
+            json.header.name += " - Patch";
+        }
 
-                        const manifests = await findAllManifests(zip);
-                        let resMan, behMan;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-                        // Classify manifests
-                        for (let { path, content } of manifests) {
-                            const json = JSON.parse(content);
-                            const type = classifyManifest(json);
-                            if (type === "resource" && !resMan) resMan = { path, json };
-                            if (type === "behavior" && !behMan) behMan = { path, json };
-                        }
-
-                        progressFill.style.width = "70%";
-
-                        if (!resMan || !behMan) {
-                            showError("Could not locate both resource & behavior manifests in the addon.");
-                            return;
-                        }
-
-                        // Extract old UUIDs & generate new ones
-                        const oldRes = resMan.json.header.uuid;
-                        const oldBeh = behMan.json.header.uuid;
-                        const newRes = makeUuid();
-                        const newBeh = makeUuid();
-
-                        // Build UUID map for replacement
-                        const uuidMap = {
-                            [oldRes]: newRes,
-                            [oldBeh]: newBeh,
-                        };
-
-                        // Update manifests
-                        updateManifest(resMan.json, uuidMap);
-                        updateManifest(behMan.json, uuidMap);
-
-                        // Write back to ZIP
-                        zip.file(resMan.path, JSON.stringify(resMan.json, null, 2));
-                        zip.file(behMan.path, JSON.stringify(behMan.json, null, 2));
-
-                        progressFill.style.width = "90%";
-
-                        // Trigger download
-                        const blob = await zip.generateAsync({ type: "blob" });
-                        download(blob, file.name.replace(".mcaddon", "_updated.mcaddon"));
-
-                        // Show success and UUIDs
-                        progressFill.style.width = "100%";
-                        output.innerHTML = `
-                        <div class="success">
-                            <span class="status-icon">✨</span> Success! Your updated addon is downloading...
-                            <p>We've successfully assigned new unique IDs to your addon!</p>
-                            <p>The old and new UUIDs have been automatically matched and updated throughout your files.</p>
-                        </div>`;
-
-                        // Display the UUIDs in a nice format
-                        uuidDisplay.innerHTML = `
-                        <div class="uuid-card">
-                            <h3>RESOURCE UUID</h3>
-                            <p>${newRes}</p>
-                        </div>
-                        <div class="uuid-card">
-                            <h3>BEHAVIOR UUID</h3>
-                            <p>${newBeh}</p>
-                        </div>
-                    `;
-
-                        // Reset progress bar after delay
-                        setTimeout(() => {
-                            progressBar.classList.remove("active");
-                        }, 2000);
-                    } catch (e) {
-                        showError("Error: " + e.message);
-                        console.error(e);
-                    }
-                });
-
-                function showError(message) {
-                    outputSection.classList.add("active");
-                    output.innerHTML = `<div class="error">❌ ${message}</div>`;
-                    progressBar.classList.remove("active");
+        const deepReplace = obj => {
+            for (const key in obj) {
+                if (!obj.hasOwnProperty(key)) continue;
+                const val = obj[key];
+                if (typeof val === "string" && uuidRegex.test(val) && uuidMap[val]) {
+                    obj[key] = uuidMap[val];
+                } else if (val && typeof val === "object") {
+                    deepReplace(val);
                 }
+            }
+        };
 
-                function makeUuid() {
-                    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-                        const r = (Math.random() * 16) | 0;
-                        const v = c === "x" ? r : (r & 0x3) | 0x8;
-                        return v.toString(16);
-                    });
-                }
+        deepReplace(json);
+    };
 
-                async function findAllManifests(zip) {
-                    const list = Object.keys(zip.files).filter((p) => p.toLowerCase().endsWith("manifest.json"));
-                    const out = [];
-                    for (let p of list) {
-                        try {
-                            const txt = await zip.file(p).async("string");
-                            out.push({ path: p, content: txt });
-                        } catch {}
-                    }
-                    return out;
-                }
+    const ensureDependencies = (behJson, resJson, newRes, newBeh) => {
+        if (!behJson.dependencies) behJson.dependencies = [];
+        if (!behJson.dependencies.some(d => d.uuid === newRes)) {
+            behJson.dependencies.push({ uuid: newRes, version: resJson.header.version || [1, 0, 0] });
+        }
 
-                function classifyManifest(json) {
-                    if (!json.modules) return "unknown";
-                    for (let m of json.modules) {
-                        if (m.type === "resources") return "resource";
-                        if (m.type === "script" || m.type === "data") return "behavior";
-                    }
-                    return "unknown";
-                }
+        if (!resJson.dependencies) resJson.dependencies = [];
+        if (!resJson.dependencies.some(d => d.uuid === newBeh)) {
+            resJson.dependencies.push({ uuid: newBeh, version: behJson.header.version || [1, 0, 0] });
+        }
+    };
 
-                function updateManifest(json, uuidMap) {
-                    // Update pack name to avoid conflicts
-                    if (json.header && typeof json.header.name === "string") {
-                        json.header.name += ` [PATCH]`;
-                    }
+    const updateProgress = (percent) => {
+        progressFill.style.width = `${percent}%`;
+    };
 
-                    // Deep replace any string matching a key in uuidMap
-                    (function deep(o) {
-                        for (let k in o) {
-                            if (typeof o[k] === "string") {
-                                if (uuidMap[o[k]]) {
-                                    o[k] = uuidMap[o[k]];
-                                }
-                            } else if (o[k] && typeof o[k] === "object") {
-                                deep(o[k]);
-                            }
-                        }
-                    })(json);
-                }
+    // --- Event Listeners ---
+    fileInput.addEventListener("change", () => {
+        fileNameDisplay.textContent = fileInput.files.length > 0 ? `Selected: ${fileInput.files[0].name}` : "";
+    });
 
-                function download(blob, filename) {
-                    const a = document.createElement("a");
-                    a.href = URL.createObjectURL(blob);
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                }
-            });
-        </script>
+    generateBtn.addEventListener("click", async () => {
+        const file = fileInput.files[0];
+
+        // Reset UI
+        outputSection.classList.remove("active");
+        uuidDisplay.innerHTML = "";
+        output.innerHTML = "";
+        progressBar.classList.add("active");
+        updateProgress(0);
+
+        if (!file) return showError("Please select a .mcaddon file first!");
+
+        try {
+            updateProgress(10);
+            outputSection.classList.add("active");
+            output.innerHTML = `<div class="success"><span class="status-icon">⛏️</span> Processing your addon...</div>`;
+
+            const zip = await JSZip.loadAsync(file);
+            updateProgress(40);
+
+            const manifests = await findAllManifests(zip);
+            let resMan, behMan;
+            for (const { path, content } of manifests) {
+                const json = JSON.parse(content);
+                const type = classifyManifest(json);
+                if (type === "resource" && !resMan) resMan = { path, json };
+                if (type === "behavior" && !behMan) behMan = { path, json };
+            }
+
+            updateProgress(60);
+
+            if (!resMan || !behMan) return showError("Could not locate both resource & behavior manifests.");
+
+            const oldRes = resMan.json.header.uuid;
+            const oldBeh = behMan.json.header.uuid;
+            const newRes = makeUuid();
+            const newBeh = makeUuid();
+            const uuidMap = { [oldRes]: newRes, [oldBeh]: newBeh };
+
+            updateManifest(resMan.json, uuidMap);
+            updateManifest(behMan.json, uuidMap);
+
+            ensureDependencies(behMan.json, resMan.json, newRes, newBeh);
+
+            zip.file(resMan.path, JSON.stringify(resMan.json, null, 2));
+            zip.file(behMan.path, JSON.stringify(behMan.json, null, 2));
+
+            updateProgress(90);
+
+            const blob = await zip.generateAsync({ type: "blob" });
+            download(blob, file.name.replace(".mcaddon", "_updated.mcaddon"));
+
+            updateProgress(100);
+            output.innerHTML = `
+                <div class="success">
+                    <span class="status-icon">✨</span> Success! Your updated addon is downloading...
+                    <p>New UUIDs have been generated and packs are cross-linked!</p>
+                </div>`;
+            uuidDisplay.innerHTML = `
+                <div class="uuid-card"><h3>RESOURCE UUID</h3><p>${newRes}</p></div>
+                <div class="uuid-card"><h3>BEHAVIOR UUID</h3><p>${newBeh}</p></div>
+            `;
+
+            setTimeout(() => progressBar.classList.remove("active"), 2000);
+
+        } catch (e) {
+            showError("Error: " + e.message);
+            console.error(e);
+        }
+    });
+});
+</script>
+
     </body>
 </html>
