@@ -119,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
         for(const path in zip.files){
             if(path.toLowerCase().endsWith("manifest.json")){
                 const content = await zip.file(path).async("string");
-                if(path.startsWith("data/") && !behManifest) behManifest={path,json:JSON.parse(content)};
+                if(path.startsWith("data/") || path.startsWith("script/") && !behManifest) behManifest={path,json:JSON.parse(content)};
                 else if(path.startsWith("resources/") && !resManifest) resManifest={path,json:JSON.parse(content)};
             }
         }
