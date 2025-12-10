@@ -158,19 +158,32 @@ document.addEventListener("DOMContentLoaded", () => {
             if(!file) continue;
             const blob = await file.async("blob");
 
-            if(/\.(png|jpg|jpeg|webp)$/i.test(path)){
-                const compressed = await imageCompression(blob,{maxSizeMB:1,maxWidthOrHeight:null,useWebWorker:true,fileType:blob.type,initialQuality:1});
-                zip.file(path,compressed,{compression:"DEFLATE",compressionOptions:{level:9}});
-            } else if(/\.(mp3|wav|ogg|flac)$/i.test(path)){
-                if(!ffmpeg.isLoaded()) await ffmpeg.load();
-                ffmpeg.FS("writeFile","input_audio"+i,await FFmpeg.fetchFile(blob));
-                await ffmpeg.run("-i","input_audio"+i,"-c:a","copy","output_audio"+i);
-                const data = ffmpeg.FS("readFile","output_audio"+i);
-                zip.file(path,new Blob([data.buffer],{type:blob.type}),{compression:"DEFLATE",compressionOptions:{level:9}});
-                ffmpeg.FS("unlink","input_audio"+i); ffmpeg.FS("unlink","output_audio"+i);
+            // Image compression
+            if(blob.type.startsWith("image/")){
+                try{
+                    const compressed = await imageCompression(blob,{
+                        maxSizeMB:1,maxWidthOrHeight:null,useWebWorker:true,fileType:blob.type,initialQuality:1
+                    });
+                    zip.file(path,compressed,{compression:"DEFLATE",compressionOptions:{level:9}});
+                }catch(err){
+                    console.warn(`Skipping invalid image: ${path}`,err);
+                }
+            } 
+            // Audio compression
+            else if(blob.type.startsWith("audio/") || /\.(mp3|wav|ogg|flac)$/i.test(path)){
+                try{
+                    if(!ffmpeg.isLoaded()) await ffmpeg.load();
+                    ffmpeg.FS("writeFile","input_audio"+i,await FFmpeg.fetchFile(blob));
+                    await ffmpeg.run("-i","input_audio"+i,"-c:a","copy","output_audio"+i);
+                    const data = ffmpeg.FS("readFile","output_audio"+i);
+                    zip.file(path,new Blob([data.buffer],{type:blob.type}),{compression:"DEFLATE",compressionOptions:{level:9}});
+                    ffmpeg.FS("unlink","input_audio"+i); ffmpeg.FS("unlink","output_audio"+i);
+                }catch(err){
+                    console.warn(`Skipping invalid audio: ${path}`,err);
+                }
             }
 
-            updateProgress(70+Math.floor(20*(i/paths.length)),`Compressing files: ${i+1}/${paths.length}`);
+            updateProgress(70 + Math.floor(20*(i/paths.length)),`Compressing files: ${i+1}/${paths.length}`);
         }
     };
 
