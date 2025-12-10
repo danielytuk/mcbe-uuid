@@ -621,7 +621,10 @@
             </div>
         </div>
 
-        <script>
+        <script type="module">
+import imageCompression from "https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.0/dist/browser-image-compression.js";
+import { createFFmpeg, fetchFile } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.8/dist/ffmpeg.min.js";
+
 document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("addon-file");
     const fileNameDisplay = document.getElementById("file-name");
@@ -632,11 +635,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const progressBar = document.getElementById("progress-bar");
     const progressFill = document.getElementById("progress-fill");
 
+    const ffmpeg = createFFmpeg({ log: true });
+
     // --- Helper functions ---
     const showError = message => {
         outputSection.classList.add("active");
-        output.innerHTML = `<div class="error">❌ ${message}</div>`;
+        output.innerHTML = `<div class="error"><span class="status-icon">❌</span> ${message}</div>`;
         progressBar.classList.remove("active");
+    };
+
+    const showStatus = (message) => {
+        outputSection.classList.add("active");
+        output.innerHTML = `<div class="processing"><span class="status-icon">⏳</span> ${message}</div>`;
+    };
+
+    const showSuccess = (message) => {
+        outputSection.classList.add("active");
+        output.innerHTML = `<div class="success"><span class="status-icon">✨</span> ${message}</div>`;
+    };
+
+    const updateProgress = (percent, message = "") => {
+        progressFill.style.width = `${percent}%`;
+        if (message) showStatus(message);
     };
 
     const makeUuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -653,27 +673,26 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.removeChild(a);
     };
 
-    const findAllManifests = async zip => {
-        const list = Object.keys(zip.files).filter(p => p.toLowerCase().endsWith("manifest.json"));
-        return Promise.all(list.map(async p => {
-            try {
-                const content = await zip.file(p).async("string");
-                return { path: p, content };
-            } catch { return null; }
-        })).then(arr => arr.filter(Boolean));
-    };
+    // --- Zip Helper Functions ---
+    const findPackManifests = async (zip) => {
+        let resManifest = null;
+        let behManifest = null;
 
-    const classifyManifest = json => {
-        if (!json.modules) return "unknown";
-        for (let m of json.modules) {
-            if (m.type === "resources") return "resource";
-            if (m.type === "script" || m.type === "data") return "behavior";
+        for (const path in zip.files) {
+            if (path.toLowerCase().endsWith("manifest.json")) {
+                const content = await zip.file(path).async("string");
+                if (path.startsWith("data/") && !behManifest) {
+                    behManifest = { path, json: JSON.parse(content) };
+                } else if (path.startsWith("resources/") && !resManifest) {
+                    resManifest = { path, json: JSON.parse(content) };
+                }
+            }
         }
-        return "unknown";
+
+        return { resManifest, behManifest };
     };
 
     const updateManifest = (json, uuidMap) => {
-        // Append "- Patch" to pack name
         if (json.header && typeof json.header.name === "string" && !json.header.name.endsWith(" - Patch")) {
             json.header.name += " - Patch";
         }
@@ -707,8 +726,36 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    const updateProgress = (percent) => {
-        progressFill.style.width = `${percent}%`;
+    const compressFiles = async (zip) => {
+        const paths = Object.keys(zip.files);
+        for (let i = 0; i < paths.length; i++) {
+            const path = paths[i];
+            const file = zip.file(path);
+            if (!file) continue;
+
+            const blob = await file.async("blob");
+
+            // Compress images
+            if (/\.(png|jpg|jpeg|webp)$/i.test(path)) {
+                const compressed = await imageCompression(blob, {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: null,
+                    useWebWorker: true,
+                    fileType: blob.type,
+                    initialQuality: 1
+                });
+                zip.file(path, compressed, { compression: "DEFLATE", compressionOptions: { level: 9 } });
+            }
+            // Compress audio using ffmpeg
+            else if (/\.(mp3|wav|ogg|flac)$/i.test(path)) {
+                if (!ffmpeg.isLoaded()) await ffmpeg.load();
+                ffmpeg.FS("writeFile", path, await fetchFile(blob));
+                await ffmpeg.run("-i", path, "-c:a", "copy", path);
+                const data = ffmpeg.FS("readFile", path);
+                zip.file(path, new Blob([data.buffer], { type: blob.type }), { compression: "DEFLATE", compressionOptions: { level: 9 } });
+            }
+            updateProgress(70 + Math.floor(20 * (i / paths.length)), `Compressing files: ${i + 1} / ${paths.length}`);
+        }
     };
 
     // --- Event Listeners ---
@@ -718,76 +765,61 @@ document.addEventListener("DOMContentLoaded", () => {
 
     generateBtn.addEventListener("click", async () => {
         const file = fileInput.files[0];
-
-        // Reset UI
         outputSection.classList.remove("active");
         uuidDisplay.innerHTML = "";
         output.innerHTML = "";
         progressBar.classList.add("active");
-        updateProgress(0);
+        updateProgress(0, "Starting process...");
 
-        if (!file) return showError("Please select a .mcaddon file first!");
+        if (!file) return showError("Please select a .mcaddon or .zip file first!");
 
         try {
-            updateProgress(10);
-            outputSection.classList.add("active");
-            output.innerHTML = `<div class="success"><span class="status-icon">⛏️</span> Processing your addon...</div>`;
-
+            updateProgress(10, "Loading file into ZIP...");
             const zip = await JSZip.loadAsync(file);
-            updateProgress(40);
 
-            const manifests = await findAllManifests(zip);
-            let resMan, behMan;
-            for (const { path, content } of manifests) {
-                const json = JSON.parse(content);
-                const type = classifyManifest(json);
-                if (type === "resource" && !resMan) resMan = { path, json };
-                if (type === "behavior" && !behMan) behMan = { path, json };
-            }
+            updateProgress(30, "Finding manifests...");
+            const { resManifest, behManifest } = await findPackManifests(zip);
 
-            updateProgress(60);
+            if (!resManifest || !behManifest) return showError("Could not locate both 'resources' and 'data' manifests.");
 
-            if (!resMan || !behMan) return showError("Could not locate both resource & behavior manifests.");
-
-            const oldRes = resMan.json.header.uuid;
-            const oldBeh = behMan.json.header.uuid;
+            updateProgress(50, "Generating new UUIDs...");
+            const oldRes = resManifest.json.header.uuid;
+            const oldBeh = behManifest.json.header.uuid;
             const newRes = makeUuid();
             const newBeh = makeUuid();
             const uuidMap = { [oldRes]: newRes, [oldBeh]: newBeh };
 
-            updateManifest(resMan.json, uuidMap);
-            updateManifest(behMan.json, uuidMap);
+            updateManifest(resManifest.json, uuidMap);
+            updateManifest(behManifest.json, uuidMap);
+            ensureDependencies(behManifest.json, resManifest.json, newRes, newBeh);
 
-            ensureDependencies(behMan.json, resMan.json, newRes, newBeh);
+            zip.file(resManifest.path, JSON.stringify(resManifest.json, null, 2));
+            zip.file(behManifest.path, JSON.stringify(behManifest.json, null, 2));
 
-            zip.file(resMan.path, JSON.stringify(resMan.json, null, 2));
-            zip.file(behMan.path, JSON.stringify(behMan.json, null, 2));
+            updateProgress(60, "Compressing images and audio...");
+            await compressFiles(zip);
 
-            updateProgress(90);
+            updateProgress(90, "Generating updated ZIP...");
+            const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 9 } });
 
-            const blob = await zip.generateAsync({ type: "blob" });
-            download(blob, file.name.replace(".mcaddon", "_updated.mcaddon"));
+            download(blob, file.name.replace(/\.(mcaddon|zip)$/i, "_updated.$1"));
+            updateProgress(100, "Addon ready! Download starting...");
 
-            updateProgress(100);
-            output.innerHTML = `
-                <div class="success">
-                    <span class="status-icon">✨</span> Success! Your updated addon is downloading...
-                    <p>New UUIDs have been generated and packs are cross-linked!</p>
-                </div>`;
+            showSuccess("Success! Your updated addon is downloading...");
             uuidDisplay.innerHTML = `
                 <div class="uuid-card"><h3>RESOURCE UUID</h3><p>${newRes}</p></div>
                 <div class="uuid-card"><h3>BEHAVIOR UUID</h3><p>${newBeh}</p></div>
             `;
 
             setTimeout(() => progressBar.classList.remove("active"), 2000);
-
         } catch (e) {
-            showError("Error: " + e.message);
             console.error(e);
+            showError("Error: " + e.message);
         }
     });
 });
 </script>
+
 
     </body>
 </html>
