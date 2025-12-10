@@ -5,36 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BEDROCK ADDON PATCHER</title>
 
-<!-- Fonts & Styles -->
 <link href="https://fonts.googleapis.com/css2?family=Minecraft&display=swap" rel="stylesheet">
 <style>
-body {
-    font-family: "Minecraft", Arial, sans-serif;
-    background-color: #1a1a1a;
-    color: white;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-}
-.container {
-    width: 90%;
-    max-width: 900px;
-    background: rgba(0,0,0,0.8);
-    padding: 25px;
-    margin: 40px auto;
-    border-radius: 8px;
-    box-shadow: 0 0 20px #00aaff;
-}
+body { font-family: "Minecraft", Arial, sans-serif; background-color: #1a1a1a; color: white; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px;}
+.container { width: 90%; max-width: 900px; background: rgba(0,0,0,0.8); padding: 25px; margin: 40px auto; border-radius: 8px; box-shadow: 0 0 20px #00aaff; }
 h1 { text-align:center; color: #ffd700; }
 .input-section { display:flex; flex-direction:column; gap:20px; margin-bottom:20px; }
-.file-input-label {
-    display:inline-block; padding:12px 24px; background-color:#5a8b2a; cursor:pointer; border-radius:4px;
-}
-.generate-btn {
-    padding:12px 24px; background-color:#ff4444; border:none; cursor:pointer; color:white; border-radius:4px;
-}
+.file-input-label { display:inline-block; padding:12px 24px; background-color:#5a8b2a; cursor:pointer; border-radius:4px; }
+.generate-btn { padding:12px 24px; background-color:#ff4444; border:none; cursor:pointer; color:white; border-radius:4px; }
 .progress-bar { width:100%; height:8px; background:#333; margin-top:10px; overflow:hidden; }
 .progress-fill { height:100%; width:0; background:linear-gradient(90deg,#ff4444,#ffd700); transition:width 0.3s; }
 #file-name, #output { margin-top:10px; }
@@ -45,7 +23,6 @@ h1 { text-align:center; color: #ffd700; }
 .status-icon { margin-right:5px; }
 </style>
 
-<!-- JS Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.0/dist/browser-image-compression.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js"></script>
@@ -80,41 +57,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const progressBar = document.getElementById("progress-bar");
     const progressFill = document.getElementById("progress-fill");
 
-    const ffmpeg = FFmpeg.createFFmpeg({ log: false });
+    // Disable threads to avoid SharedArrayBuffer issues
+    const ffmpeg = FFmpeg.createFFmpeg({ log: false, corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg-core.js' });
 
-    const showError = (msg) => {
-        outputSection.classList.add("active");
-        output.innerHTML = `<div class="error"><span class="status-icon">❌</span>${msg}</div>`;
-        progressBar.classList.remove("active");
-    };
-    const showStatus = (msg) => {
-        outputSection.classList.add("active");
-        output.innerHTML = `<div class="processing"><span class="status-icon">⏳</span>${msg}</div>`;
-    };
-    const showSuccess = (msg) => {
-        outputSection.classList.add("active");
-        output.innerHTML = `<div class="success"><span class="status-icon">✨</span>${msg}</div>`;
-    };
-    const updateProgress = (percent,msg="") => {
-        progressFill.style.width = percent + "%";
-        if(msg) showStatus(msg);
-    };
-    const formatBytes = (bytes) => {
-        if(bytes===0)return "0 B";
-        const k=1024,s=["B","KB","MB","GB"],i=Math.floor(Math.log(bytes)/Math.log(k));
-        return parseFloat((bytes/Math.pow(k,i)).toFixed(2))+" "+s[i];
-    };
-    const makeUuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
-        const r = (Math.random()*16)|0; return (c==='x'?r:(r&0x3)|0x8).toString(16);
-    });
-    const download = (blob, filename) => {
-        const a=document.createElement("a");
-        a.href=URL.createObjectURL(blob);
-        a.download=filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    };
+    const showError = (msg) => { outputSection.classList.add("active"); output.innerHTML = `<div class="error"><span class="status-icon">❌</span>${msg}</div>`; progressBar.classList.remove("active"); };
+    const showStatus = (msg) => { outputSection.classList.add("active"); output.innerHTML = `<div class="processing"><span class="status-icon">⏳</span>${msg}</div>`; };
+    const showSuccess = (msg) => { outputSection.classList.add("active"); output.innerHTML = `<div class="success"><span class="status-icon">✨</span>${msg}</div>`; };
+    const updateProgress = (percent,msg="") => { progressFill.style.width = percent + "%"; if(msg) showStatus(msg); };
+    const formatBytes = (bytes) => { if(bytes===0)return "0 B"; const k=1024,s=["B","KB","MB","GB"],i=Math.floor(Math.log(bytes)/Math.log(k)); return parseFloat((bytes/Math.pow(k,i)).toFixed(2))+" "+s[i]; };
+    const makeUuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{ const r = (Math.random()*16)|0; return (c==='x'?r:(r&0x3)|0x8).toString(16); });
+    const download = (blob, filename) => { const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
 
     const findPackManifests = async (zip) => {
         let resManifest=null, behManifest=null;
@@ -161,9 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Image compression
             if(blob.type.startsWith("image/")){
                 try{
-                    const compressed = await imageCompression(blob,{
-                        maxSizeMB:1,maxWidthOrHeight:null,useWebWorker:true,fileType:blob.type,initialQuality:1
-                    });
+                    const compressed = await imageCompression(blob,{maxSizeMB:1,maxWidthOrHeight:null,useWebWorker:true,fileType:blob.type,initialQuality:1});
                     zip.file(path,compressed,{compression:"DEFLATE",compressionOptions:{level:9}});
                 }catch(err){
                     console.warn(`Skipping invalid image: ${path}`,err);
@@ -173,11 +123,26 @@ document.addEventListener("DOMContentLoaded", () => {
             else if(blob.type.startsWith("audio/") || /\.(mp3|wav|ogg|flac)$/i.test(path)){
                 try{
                     if(!ffmpeg.isLoaded()) await ffmpeg.load();
-                    ffmpeg.FS("writeFile","input_audio"+i,await FFmpeg.fetchFile(blob));
-                    await ffmpeg.run("-i","input_audio"+i,"-c:a","copy","output_audio"+i);
-                    const data = ffmpeg.FS("readFile","output_audio"+i);
+                    const inputName = "input_audio"+i;
+                    const outputName = "output_audio"+i;
+                    ffmpeg.FS("writeFile", inputName, await FFmpeg.fetchFile(blob));
+
+                    // Re-encode with format-preserving and quality
+                    if(path.toLowerCase().endsWith(".ogg")){
+                        await ffmpeg.run("-i", inputName, "-c:a", "libvorbis", "-qscale:a", "6", outputName);
+                    } else if(path.toLowerCase().endsWith(".mp3")){
+                        await ffmpeg.run("-i", inputName, "-c:a", "libmp3lame", "-qscale:a", "2", outputName);
+                    } else if(path.toLowerCase().endsWith(".wav")){
+                        await ffmpeg.run("-i", inputName, "-c:a", "pcm_s16le", outputName);
+                    } else if(path.toLowerCase().endsWith(".flac")){
+                        await ffmpeg.run("-i", inputName, "-c:a", "flac", outputName);
+                    } else {
+                        await ffmpeg.run("-i", inputName, "-c:a", "copy", outputName);
+                    }
+
+                    const data = ffmpeg.FS("readFile", outputName);
                     zip.file(path,new Blob([data.buffer],{type:blob.type}),{compression:"DEFLATE",compressionOptions:{level:9}});
-                    ffmpeg.FS("unlink","input_audio"+i); ffmpeg.FS("unlink","output_audio"+i);
+                    ffmpeg.FS("unlink", inputName); ffmpeg.FS("unlink", outputName);
                 }catch(err){
                     console.warn(`Skipping invalid audio: ${path}`,err);
                 }
