@@ -855,6 +855,7 @@ document.addEventListener("DOMContentLoaded", () => {
             updateProgress(40, "Reading pack info...");
             const packInfo = await getPackInfoFromLang(zip);
 
+            // --- NEW: apply Lang info to BOTH manifests if present ---
             if (packInfo && (packInfo.name || packInfo.description) && packInfoBox) {
                 packInfoBox.innerHTML = `
                     <h3>Pack Info (en_US.lang)</h3>
@@ -863,15 +864,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 `;
                 packInfoBox.classList.add("visible");
 
-                // Optionally sync Lang -> manifest header
-                if (resManifest.json && resManifest.json.header) {
-                    if (packInfo.name) {
-                        resManifest.json.header.name = packInfo.name + " - Patch";
+                const manifestsToSync = [resManifest, behManifest];
+                manifestsToSync.forEach(m => {
+                    if (m && m.json && m.json.header) {
+                        if (packInfo.name) {
+                            m.json.header.name = packInfo.name + " - Patch";
+                        }
+                        if (packInfo.description) {
+                            m.json.header.description = packInfo.description + " (patched)";
+                        }
                     }
-                    if (packInfo.description) {
-                        resManifest.json.header.description = packInfo.description + " (patched)";
-                    }
-                }
+                });
             }
 
             updateProgress(50, "Generating new UUIDs...");
@@ -886,12 +889,40 @@ document.addEventListener("DOMContentLoaded", () => {
                 [oldBeh]: newBeh
             };
 
+            // Update both manifests (resources + data/behavior)
             updateManifest(resManifest.json, uuidMap);
             updateManifest(behManifest.json, uuidMap);
             ensureDependencies(behManifest.json, resManifest.json, newRes, newBeh);
 
             zip.file(resManifest.path, JSON.stringify(resManifest.json, null, 2));
             zip.file(behManifest.path, JSON.stringify(behManifest.json, null, 2));
+
+            // --- NEW: build world_*_packs.json descriptors ---
+            const resVersion = (resManifest.json.header && resManifest.json.header.version) || [1, 0, 0];
+            const behVersion = (behManifest.json.header && behManifest.json.header.version) || [1, 0, 0];
+
+            const worldResourcePacks = [
+                {
+                    pack_id: newRes,
+                    version: resVersion
+                }
+            ];
+
+            const worldBehaviorPacks = [
+                {
+                    pack_id: newBeh,
+                    version: behVersion
+                }
+            ];
+
+            const worldResourcePacksBlob = new Blob(
+                [JSON.stringify(worldResourcePacks, null, 2)],
+                { type: "application/json" }
+            );
+            const worldBehaviorPacksBlob = new Blob(
+                [JSON.stringify(worldBehaviorPacks, null, 2)],
+                { type: "application/json" }
+            );
 
             updateProgress(60, "Optimizing images and audio...");
             await compressFiles(zip);
@@ -908,10 +939,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const compressionRatio = ((1 - finalSize / originalSize) * 100).toFixed(2);
 
             const newName = file.name.replace(/\.(mcaddon|zip)$/i, "_updated.$1");
+
+            // Main updated addon download
             download(blob, newName);
 
-            updateProgress(100, "Addon ready! Download starting...");
-            showSuccess("Success! Your patched addon is downloading.");
+            // NEW: extra files the user asked for
+            download(worldResourcePacksBlob, "world_resource_packs.json");
+            download(worldBehaviorPacksBlob, "world_behavior_packs.json");
+
+            updateProgress(100, "Addon ready! Downloads starting...");
+            showSuccess("Success! Your patched addon and world_*_packs files are downloading.");
 
             uuidDisplay.innerHTML = `
                 <div class="uuid-card">
