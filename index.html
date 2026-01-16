@@ -1,47 +1,471 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BEDROCK ADDON PATCHER</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bedrock Addon Patcher</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Minecraft&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Minecraft&display=swap" rel="stylesheet" />
+
 <style>
+:root {
+    --bg-dark: #0b0f10;
+    --bg-card: #14191d;
+    --accent-green: #5bbf3a;
+    --accent-green-soft: #436f2c;
+    --accent-red: #ff4b4b;
+    --accent-gold: #f6c453;
+    --accent-cyan: #00d4f5;
+    --border-soft: #232a30;
+    --text-main: #f5f5f5;
+    --text-muted: #a4b0be;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 body {
-    font-family: "Minecraft", Arial, sans-serif;
-    background-color: #1a1a1a;
-    color: white;
+    margin: 0;
     min-height: 100vh;
+    font-family: "Minecraft", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+        linear-gradient(135deg, rgba(0, 120, 200, 0.08), transparent),
+        radial-gradient(circle at top, rgba(246, 196, 83, 0.12), transparent),
+        #050608;
+    color: var(--text-main);
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding: 24px;
+}
+
+/* Main layout shell */
+.app-shell {
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    background: radial-gradient(circle at top left, rgba(0, 212, 245, 0.05), transparent 50%) var(--bg-dark);
+    border-radius: 18px;
+    border: 1px solid rgba(0, 212, 245, 0.25);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        0 18px 40px rgba(0, 0, 0, 0.8);
+    padding: 24px 24px 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle Minecraft-ish grid */
+.app-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 16px 16px;
+    opacity: 0.45;
+    pointer-events: none;
+    mix-blend-mode: soft-light;
+}
+
+/* Header */
+.app-header {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    z-index: 1;
+}
+
+.app-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.app-badge {
+    font-size: 28px;
+    filter: drop-shadow(0 0 10px rgba(246, 196, 83, 0.8));
+}
+
+.app-heading {
+    margin: 0;
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.app-subtitle {
+    margin: 2px 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.app-chip {
+    padding: 6px 10px;
+    background: linear-gradient(135deg, rgba(246, 196, 83, 0.22), rgba(0, 212, 245, 0.1));
+    border-radius: 999px;
+    border: 1px solid rgba(246, 196, 83, 0.4);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-gold);
+}
+
+/* Layout columns */
+.app-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.4fr);
+    gap: 20px;
+    z-index: 1;
+}
+
+@media (max-width: 840px) {
+    .app-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* Cards / panels */
+.card {
+    background: linear-gradient(180deg, rgba(20, 25, 29, 0.96), rgba(10, 12, 15, 0.98));
+    border-radius: 14px;
+    border: 1px solid var(--border-soft);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7);
+    padding: 18px 18px 16px;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.card-title {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+}
+
+.card-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.card-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: #2f3542;
+}
+
+.card-dot.green { background: #2ed573; }
+.card-dot.yellow { background: #ffa502; }
+.card-dot.red { background: #ff4757; }
+
+/* Upload zone */
+.upload-zone {
+    border-radius: 12px;
+    border: 1px dashed rgba(91, 191, 58, 0.6);
+    background: radial-gradient(circle at top, rgba(91, 191, 58, 0.08), transparent 60%);
+    padding: 18px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    text-align: center;
+    gap: 10px;
+    margin-bottom: 14px;
 }
-.container {
-    width: 90%;
-    max-width: 900px;
-    background: rgba(0,0,0,0.8);
-    padding: 25px;
-    margin: 40px auto;
+
+.upload-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px solid rgba(91, 191, 58, 0.85);
+    background: linear-gradient(135deg, #5bbf3a, #7ee065);
+    color: #041107;
+    cursor: pointer;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    box-shadow:
+        0 4px 0 #35591d,
+        0 10px 18px rgba(0, 0, 0, 0.7);
+    transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.08s ease;
+}
+
+.upload-label:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+    box-shadow:
+        0 5px 0 #35591d,
+        0 16px 26px rgba(0, 0, 0, 0.9);
+}
+
+.upload-label:active {
+    transform: translateY(2px);
+    box-shadow:
+        0 1px 0 #35591d,
+        0 4px 10px rgba(0, 0, 0, 0.7);
+}
+
+.upload-label-icon {
+    font-size: 1rem;
+}
+
+.upload-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.file-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: #0c0f11;
     border-radius: 8px;
-    box-shadow: 0 0 20px #00aaff;
+    padding: 8px 10px;
+    border: 1px solid rgba(78, 90, 104, 0.7);
+    margin-bottom: 10px;
 }
-h1 { text-align:center; color: #ffd700; }
-.input-section { display:flex; flex-direction:column; gap:20px; margin-bottom:20px; }
-.file-input-label {
-    display:inline-block; padding:12px 24px; background-color:#5a8b2a; cursor:pointer; border-radius:4px;
-}
+
+/* Primary button */
 .generate-btn {
-    padding:12px 24px; background-color:#ff4444; border:none; cursor:pointer; color:white; border-radius:4px;
+    width: 100%;
+    margin-top: 6px;
+    padding: 11px 18px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 75, 75, 0.9);
+    background: linear-gradient(135deg, #ff4b4b, #ff7675);
+    color: #240000;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    box-shadow:
+        0 4px 0 #7e1e1e,
+        0 14px 26px rgba(0, 0, 0, 0.85);
+    transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.08s ease;
 }
-.progress-bar { width:100%; height:8px; background:#333; margin-top:10px; overflow:hidden; }
-.progress-fill { height:100%; width:0; background:linear-gradient(90deg,#ff4444,#ffd700); transition:width 0.3s; }
-#file-name, #output { margin-top:10px; }
-.uuid-card { background:rgba(0,0,0,0.7); border:2px solid #00d4f5; padding:10px; margin:5px; display:inline-block; }
-.error { color:#ff5555; }
-.success { color:#2fd4ff; }
-.processing { color:#ffd700; }
-.status-icon { margin-right:5px; }
+
+.generate-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+    box-shadow:
+        0 5px 0 #7e1e1e,
+        0 20px 32px rgba(0, 0, 0, 0.95);
+}
+
+.generate-btn:active {
+    transform: translateY(2px);
+    box-shadow:
+        0 2px 0 #7e1e1e,
+        0 6px 14px rgba(0, 0, 0, 0.75);
+}
+
+/* Progress bar */
+.progress-wrapper {
+    margin-top: 12px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: #050709;
+    border: 1px solid #1e252c;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.progress-bar.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #ff4b4b, #f6c453, #00d4f5);
+    background-size: 200% 100%;
+    animation: progressGlow 1.4s linear infinite;
+    transition: width 0.3s ease;
+}
+
+@keyframes progressGlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Status + UUID panel */
+.output-section {
+    margin-top: 10px;
+    display: none;
+    font-size: 0.85rem;
+}
+
+.output-section.active {
+    display: block;
+}
+
+.status-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    border-radius: 9px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    background: rgba(9, 11, 14, 0.96);
+    border: 1px solid #252c33;
+}
+
+.status-icon {
+    font-size: 1.1rem;
+    margin-top: 1px;
+}
+
+/* Status colors */
+.error {
+    color: #ff7676;
+    border-color: rgba(255, 75, 75, 0.7);
+    background: radial-gradient(circle at top left, rgba(255, 75, 75, 0.15), rgba(9, 11, 14, 0.96));
+}
+
+.processing {
+    color: #f6c453;
+    border-color: rgba(246, 196, 83, 0.8);
+    background: radial-gradient(circle at top left, rgba(246, 196, 83, 0.18), rgba(9, 11, 14, 0.96));
+}
+
+.success {
+    color: #7bed9f;
+    border-color: rgba(91, 191, 58, 0.9);
+    background: radial-gradient(circle at top left, rgba(91, 191, 58, 0.2), rgba(9, 11, 14, 0.96));
+}
+
+/* UUID display */
+.uuid-display {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 8px;
+}
+
+.uuid-card {
+    background: #050709;
+    border-radius: 9px;
+    border: 1px solid rgba(0, 212, 245, 0.6);
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    box-shadow: 0 8px 14px rgba(0, 0, 0, 0.75);
+}
+
+.uuid-card h3 {
+    margin: 0 0 6px;
+    font-size: 0.75rem;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+}
+
+.uuid-card p {
+    margin: 0;
+    font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    word-break: break-all;
+}
+
+/* Side info panel */
+.info-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.info-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(33, 40, 48, 0.9);
+}
+
+.info-list li:last-child {
+    border-bottom: none;
+}
+
+.info-badge {
+    font-size: 0.9rem;
+}
+
+.info-strong {
+    color: var(--accent-gold);
+    font-size: 0.82rem;
+}
+
+/* Pack info block */
+.pack-info {
+    margin-top: 10px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(0, 212, 245, 0.5);
+    background: radial-gradient(circle at top right, rgba(0, 212, 245, 0.15), rgba(8, 11, 15, 0.97));
+    font-size: 0.8rem;
+    display: none;
+}
+
+.pack-info.visible {
+    display: block;
+}
+
+.pack-info h3 {
+    margin: 0 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    font-size: 0.78rem;
+    color: var(--accent-cyan);
+}
+
+.pack-info p {
+    margin: 2px 0;
+}
+
+/* Size summary block */
+.size-summary {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(120, 224, 143, 0.75);
+    background: linear-gradient(135deg, rgba(120, 224, 143, 0.16), rgba(56, 173, 169, 0.18));
+    font-size: 0.8rem;
+}
+
+/* Utility */
+.mono {
+    font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Hide native file input */
+#addon-file {
+    display: none;
+}
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
@@ -50,205 +474,471 @@ h1 { text-align:center; color: #ffd700; }
 </head>
 
 <body>
-<div class="container">
-    <h1>🧱 BEDROCK ADDON PATCHER ⚒️</h1>
+<div class="app-shell">
+    <header class="app-header">
+        <div class="app-title">
+            <div class="app-badge">🧱</div>
+            <div>
+                <h1 class="app-heading">Bedrock Addon Patcher</h1>
+                <p class="app-subtitle">UUID refresh • media optimization • pack info</p>
+            </div>
+        </div>
+        <div class="app-chip">Minecraft Bedrock • Client-side</div>
+    </header>
 
-    <div class="input-section">
-        <label for="addon-file" class="file-input-label">CHOOSE .MCADDON OR .ZIP FILE</label>
-        <input type="file" id="addon-file" accept=".mcaddon,.zip" style="display:none;">
-        <div id="file-name"></div>
-        <button class="generate-btn" id="generate-uuids">GENERATE NEW UUIDS</button>
-    </div>
+    <main class="app-body">
+        <!-- Left: main actions -->
+        <section class="card">
+            <div class="card-header">
+                <span class="card-title">Patch & Optimize</span>
+                <div class="card-dots">
+                    <span class="card-dot red"></span>
+                    <span class="card-dot yellow"></span>
+                    <span class="card-dot green"></span>
+                </div>
+            </div>
 
-    <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-    <div class="output-section" id="output-section">
-        <div id="output"></div>
-        <div id="uuid-display"></div>
-    </div>
+            <div class="upload-zone">
+                <label for="addon-file" class="upload-label">
+                    <span class="upload-label-icon">📦</span>
+                    <span>Choose .mcaddon or .zip</span>
+                </label>
+                <p class="upload-hint">We’ll generate fresh UUIDs and try to shrink textures & audio without breaking anything.</p>
+            </div>
+
+            <input type="file" id="addon-file" accept=".mcaddon,.zip" />
+
+            <div id="file-name" class="file-meta"></div>
+
+            <button class="generate-btn" id="generate-uuids">
+                ▶ Generate & Patch
+            </button>
+
+            <div class="progress-wrapper">
+                <div class="progress-bar" id="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="output-section" id="output-section">
+                <div id="output"></div>
+                <div id="uuid-display" class="uuid-display"></div>
+            </div>
+        </section>
+
+        <!-- Right: info panel -->
+        <aside class="card">
+            <div class="card-header">
+                <span class="card-title">Pack Details</span>
+                <div class="card-dots">
+                    <span class="card-dot green"></span>
+                    <span class="card-dot yellow"></span>
+                    <span class="card-dot red"></span>
+                </div>
+            </div>
+
+            <ul class="info-list">
+                <li>
+                    <span class="info-badge">🧬</span>
+                    <div>
+                        <div class="info-strong">UUIDs</div>
+                        <div>All manifest UUIDs are regenerated and references are updated across both packs.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="info-badge">🖼️</span>
+                    <div>
+                        <div class="info-strong">Textures</div>
+                        <div>PNG transparency is preserved. JPG/WEBP are recompressed, but without resizing.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="info-badge">🎧</span>
+                    <div>
+                        <div class="info-strong">Audio</div>
+                        <div>Audio files are passed through FFmpeg and deflated inside the archive.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="info-badge">ℹ️</span>
+                    <div>
+                        <div class="info-strong">Pack Info</div>
+                        <div>Reads <span class="mono">/texts/en_US.lang</span> for <span class="mono">pack.name</span> &amp; <span class="mono">pack.description</span>.</div>
+                    </div>
+                </li>
+            </ul>
+
+            <div id="pack-info" class="pack-info"></div>
+        </aside>
+    </main>
 </div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    const fileInput = document.getElementById("addon-file");
-    const fileNameDisplay = document.getElementById("file-name");
-    const generateBtn = document.getElementById("generate-uuids");
-    const outputSection = document.getElementById("output-section");
-    const output = document.getElementById("output");
-    const uuidDisplay = document.getElementById("uuid-display");
-    const progressBar = document.getElementById("progress-bar");
-    const progressFill = document.getElementById("progress-fill");
+    const fileInput      = document.getElementById("addon-file");
+    const fileNameDisplay= document.getElementById("file-name");
+    const generateBtn    = document.getElementById("generate-uuids");
+    const outputSection  = document.getElementById("output-section");
+    const output         = document.getElementById("output");
+    const uuidDisplay    = document.getElementById("uuid-display");
+    const progressBar    = document.getElementById("progress-bar");
+    const progressFill   = document.getElementById("progress-fill");
+    const packInfoBox    = document.getElementById("pack-info");
 
     const ffmpeg = FFmpeg.createFFmpeg({ log: false });
 
+    /* ---------- UI helpers ---------- */
     const showError = (msg) => {
         outputSection.classList.add("active");
-        output.innerHTML = `<div class="error"><span class="status-icon">❌</span>${msg}</div>`;
+        output.innerHTML = `<div class="status-line error">
+            <span class="status-icon">❌</span>
+            <span>${msg}</span>
+        </div>`;
         progressBar.classList.remove("active");
     };
+
     const showStatus = (msg) => {
         outputSection.classList.add("active");
-        output.innerHTML = `<div class="processing"><span class="status-icon">⏳</span>${msg}</div>`;
+        output.innerHTML = `<div class="status-line processing">
+            <span class="status-icon">⏳</span>
+            <span>${msg}</span>
+        </div>`;
     };
+
     const showSuccess = (msg) => {
         outputSection.classList.add("active");
-        output.innerHTML = `<div class="success"><span class="status-icon">✨</span>${msg}</div>`;
+        output.innerHTML = `<div class="status-line success">
+            <span class="status-icon">✨</span>
+            <span>${msg}</span>
+        </div>`;
     };
-    const updateProgress = (percent,msg="") => {
+
+    const updateProgress = (percent, msg = "") => {
         progressFill.style.width = percent + "%";
-        if(msg) showStatus(msg);
+        if (msg) showStatus(msg);
+        if (!progressBar.classList.contains("active")) {
+            progressBar.classList.add("active");
+        }
     };
+
     const formatBytes = (bytes) => {
-        if(bytes===0)return "0 B";
-        const k=1024,s=["B","KB","MB","GB"],i=Math.floor(Math.log(bytes)/Math.log(k));
-        return parseFloat((bytes/Math.pow(k,i)).toFixed(2))+" "+s[i];
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
     };
-    const makeUuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
-        const r = (Math.random()*16)|0; return (c==='x'?r:(r&0x3)|0x8).toString(16);
+
+    const makeUuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
     });
+
     const download = (blob, filename) => {
-        const a=document.createElement("a");
-        a.href=URL.createObjectURL(blob);
-        a.download=filename;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
     };
 
-    const findPackManifests = async (zip) => {
-        let resManifest=null, behManifest=null;
-        for(const path in zip.files){
-            if(path.toLowerCase().endsWith("manifest.json")){
-                const content = await zip.file(path).async("string");
-                if(path.startsWith("data/") || path.startsWith("script/") && !behManifest) behManifest={path,json:JSON.parse(content)};
-                else if(path.startsWith("resources/") && !resManifest) resManifest={path,json:JSON.parse(content)};
+    /* ---------- Pack info from /texts/en_US.lang ---------- */
+    const getPackInfoFromLang = async (zip) => {
+        const paths = Object.keys(zip.files);
+        const langPath = paths.find(p => /\/texts\/en_US\.lang$/i.test(p));
+        if (!langPath) return null;
+
+        const content = await zip.file(langPath).async("string");
+        const lines = content.split(/\r?\n/);
+
+        let packName = null;
+        let packDescription = null;
+
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line || line.startsWith("#") || line.startsWith("//")) continue;
+
+            if (line.startsWith("pack.name=")) {
+                packName = line.substring("pack.name=".length).trim();
+            } else if (line.startsWith("pack.description=")) {
+                packDescription = line.substring("pack.description=".length).trim();
             }
         }
-        return {resManifest,behManifest};
+
+        return { name: packName, description: packDescription };
     };
 
-    const updateManifest = (json,uuidMap)=>{
-        if(json.header && typeof json.header.name==="string" && !json.header.name.endsWith(" - Patch"))
-            json.header.name+=" - Patch";
-        const uuidRegex=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        const deepReplace=(obj)=>{
-            for(const key in obj){
-                if(!obj.hasOwnProperty(key)) continue;
-                const val=obj[key];
-                if(typeof val==="string" && uuidRegex.test(val) && uuidMap[val]) obj[key]=uuidMap[val];
-                else if(val && typeof val==="object") deepReplace(val);
+    /* ---------- Manifest handling ---------- */
+    const findPackManifests = async (zip) => {
+        let resManifest = null;
+        let behManifest = null;
+
+        for (const path in zip.files) {
+            if (path.toLowerCase().endsWith("manifest.json")) {
+                const content = await zip.file(path).async("string");
+                const json = JSON.parse(content);
+
+                // heuristic: resources vs behavior/data
+                if ((path.startsWith("data/") || path.startsWith("script/")) && !behManifest) {
+                    behManifest = { path, json };
+                } else if (path.startsWith("resources/") && !resManifest) {
+                    resManifest = { path, json };
+                }
+            }
+        }
+        return { resManifest, behManifest };
+    };
+
+    const updateManifest = (json, uuidMap) => {
+        // Append " - Patch" once to header name
+        if (json.header && typeof json.header.name === "string" && !json.header.name.endsWith(" - Patch")) {
+            json.header.name += " - Patch";
+        }
+
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+        const deepReplace = (obj) => {
+            for (const key in obj) {
+                if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+                const val = obj[key];
+
+                if (typeof val === "string" && uuidRegex.test(val) && uuidMap[val]) {
+                    obj[key] = uuidMap[val];
+                } else if (val && typeof val === "object") {
+                    deepReplace(val);
+                }
             }
         };
+
         deepReplace(json);
     };
 
-    const ensureDependencies=(behJson,resJson,newRes,newBeh)=>{
-        if(!behJson.dependencies) behJson.dependencies=[];
-        if(!behJson.dependencies.some(d=>d.uuid===newRes)) behJson.dependencies.push({uuid:newRes,version:resJson.header.version||[1,0,0]});
-        if(!resJson.dependencies) resJson.dependencies=[];
-        if(!resJson.dependencies.some(d=>d.uuid===newBeh)) resJson.dependencies.push({uuid:newBeh,version:behJson.header.version||[1,0,0]});
+    const ensureDependencies = (behJson, resJson, newRes, newBeh) => {
+        if (!behJson.dependencies) behJson.dependencies = [];
+        if (!behJson.dependencies.some(d => d.uuid === newRes)) {
+            behJson.dependencies.push({
+                uuid: newRes,
+                version: resJson.header.version || [1, 0, 0]
+            });
+        }
+
+        if (!resJson.dependencies) resJson.dependencies = [];
+        if (!resJson.dependencies.some(d => d.uuid === newBeh)) {
+            resJson.dependencies.push({
+                uuid: newBeh,
+                version: behJson.header.version || [1, 0, 0]
+            });
+        }
     };
 
-    const compressFiles = async (zip)=>{
-        const paths=Object.keys(zip.files);
-        for(let i=0;i<paths.length;i++){
+    /* ---------- Image compression helper ---------- */
+    const compressImageIfBeneficial = async (blob, ext) => {
+        const originalSize = blob.size;
+        let options = {
+            useWebWorker: true
+        };
+
+        // Preserve transparency & PNG format
+        if (ext === "png" || ext === "apng") {
+            options.fileType = "image/png";
+            // No maxWidthOrHeight -> do not resize
+        } else {
+            // JPEG / WEBP / etc.
+            options.fileType = blob.type || "image/jpeg";
+            options.initialQuality = 0.8; // reduce quality a bit for better size
+        }
+
+        try {
+            const compressedBlob = await imageCompression(blob, options);
+
+            // Only use compressed version if it's actually smaller
+            if (compressedBlob && compressedBlob.size > 0 && compressedBlob.size < originalSize) {
+                return compressedBlob;
+            }
+        } catch (err) {
+            console.warn("Image compression failed, keeping original:", err);
+        }
+        return blob;
+    };
+
+    /* ---------- Iterate zip & compress media ---------- */
+    const compressFiles = async (zip) => {
+        const paths = Object.keys(zip.files);
+
+        for (let i = 0; i < paths.length; i++) {
             const path = paths[i];
             const file = zip.file(path);
-            if(!file) continue;
+            if (!file) continue;
+
+            const extMatch = path.match(/\.([^.]+)$/);
+            const ext = extMatch ? extMatch[1].toLowerCase() : "";
             const blob = await file.async("blob");
 
-            // Image compression
-            if(blob.type.startsWith("image/")){
-                try{
-                    const compressed = await imageCompression(blob,{
-                        maxSizeMB:1,maxWidthOrHeight:null,useWebWorker:true,fileType:blob.type,initialQuality:1
-                    });
-                    zip.file(path,compressed,{compression:"DEFLATE",compressionOptions:{level:9}});
-                }catch(err){
-                    console.warn(`Skipping invalid image: ${path}`,err);
-                }
-            } 
-            // Audio compression
-            else if(blob.type.startsWith("audio/") || /\.(mp3|wav|ogg|flac)$/i.test(path)){
-                try{
-                    if(!ffmpeg.isLoaded()) await ffmpeg.load();
-                    ffmpeg.FS("writeFile","input_audio"+i,await FFmpeg.fetchFile(blob));
-                    await ffmpeg.run("-i","input_audio"+i,"-c:a","copy","output_audio"+i);
-                    const data = ffmpeg.FS("readFile","output_audio"+i);
-                    zip.file(path,new Blob([data.buffer],{type:blob.type}),{compression:"DEFLATE",compressionOptions:{level:9}});
-                    ffmpeg.FS("unlink","input_audio"+i); ffmpeg.FS("unlink","output_audio"+i);
-                }catch(err){
-                    console.warn(`Skipping invalid audio: ${path}`,err);
+            // IMAGE COMPRESSION (no resize; keep PNG transparent)
+            if (["png", "apng", "jpg", "jpeg", "webp"].includes(ext)) {
+                const optimizedBlob = await compressImageIfBeneficial(blob, ext);
+                zip.file(path, optimizedBlob, { compression: "DEFLATE", compressionOptions: { level: 9 } });
+            }
+            // AUDIO "compression" (currently remux/deflate)
+            else if (
+                blob.type.startsWith("audio/") ||
+                /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(path)
+            ) {
+                try {
+                    if (!ffmpeg.isLoaded()) await ffmpeg.load();
+
+                    const inputName = "input_audio_" + i;
+                    const outputName = "output_audio_" + i + ".ogg";
+
+                    ffmpeg.FS("writeFile", inputName, await FFmpeg.fetchFile(blob));
+
+                    // Re-encode to OGG (usually smaller than WAV/FLAC/etc)
+                    await ffmpeg.run("-i", inputName, "-c:a", "libvorbis", "-qscale:a", "5", outputName);
+
+                    const data = ffmpeg.FS("readFile", outputName);
+                    const outBlob = new Blob([data.buffer], { type: "audio/ogg" });
+
+                    zip.file(path, outBlob, { compression: "DEFLATE", compressionOptions: { level: 9 } });
+
+                    ffmpeg.FS("unlink", inputName);
+                    ffmpeg.FS("unlink", outputName);
+                } catch (err) {
+                    console.warn(`Skipping audio recompression: ${path}`, err);
                 }
             }
 
-            updateProgress(70 + Math.floor(20*(i/paths.length)),`Compressing files: ${i+1}/${paths.length}`);
+            updateProgress(70 + Math.floor(20 * (i / paths.length)), `Optimizing files: ${i + 1}/${paths.length}`);
         }
     };
 
-    fileInput.addEventListener("change",()=>{
-        const file=fileInput.files[0];
-        if(!file){fileNameDisplay.textContent=""; return;}
-        fileNameDisplay.innerHTML = `<strong>File Loaded:</strong> ${file.name}<br/><strong>Original Size:</strong> ${formatBytes(file.size)}`;
+    /* ---------- File selection UI ---------- */
+    fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        if (!file) {
+            fileNameDisplay.textContent = "";
+            return;
+        }
+        fileNameDisplay.innerHTML = `<strong>File loaded:</strong> ${file.name}<br><strong>Original size:</strong> ${formatBytes(file.size)}`;
         showStatus("File loaded. Ready to generate UUIDs and optimize.");
     });
 
-    generateBtn.addEventListener("click",async ()=>{
+    /* ---------- Main button click ---------- */
+    generateBtn.addEventListener("click", async () => {
         const file = fileInput.files[0];
-        outputSection.classList.remove("active"); uuidDisplay.innerHTML=""; output.innerHTML="";
-        progressBar.classList.add("active"); updateProgress(0,"Starting process...");
 
-        if(!file) return showError("Please select a .mcaddon or .zip file first!");
+        outputSection.classList.remove("active");
+        uuidDisplay.innerHTML = "";
+        output.innerHTML = "";
+        if (packInfoBox) {
+            packInfoBox.classList.remove("visible");
+            packInfoBox.innerHTML = "";
+        }
+        progressBar.classList.add("active");
+        updateProgress(0, "Starting process...");
 
-        try{
-            updateProgress(10,"Loading file into ZIP...");
+        if (!file) {
+            return showError("Please select a .mcaddon or .zip file first!");
+        }
+
+        try {
+            updateProgress(10, "Loading file into ZIP...");
             const zip = await JSZip.loadAsync(file);
 
-            updateProgress(30,"Finding manifests...");
-            const {resManifest,behManifest}=await findPackManifests(zip);
-            if(!resManifest || !behManifest) return showError("Could not locate both 'resources' and 'data' manifests.");
+            updateProgress(30, "Locating manifests...");
+            const { resManifest, behManifest } = await findPackManifests(zip);
+            if (!resManifest || !behManifest) {
+                return showError("Could not locate both 'resources' and 'data' manifests.");
+            }
 
-            updateProgress(50,"Generating new UUIDs...");
-            const oldRes=resManifest.json.header.uuid;
-            const oldBeh=behManifest.json.header.uuid;
-            const newRes=makeUuid();
-            const newBeh=makeUuid();
-            const uuidMap={[oldRes]:newRes,[oldBeh]:newBeh};
+            updateProgress(40, "Reading pack info...");
+            const packInfo = await getPackInfoFromLang(zip);
 
-            updateManifest(resManifest.json,uuidMap);
-            updateManifest(behManifest.json,uuidMap);
-            ensureDependencies(behManifest.json,resManifest.json,newRes,newBeh);
+            if (packInfo && (packInfo.name || packInfo.description) && packInfoBox) {
+                packInfoBox.innerHTML = `
+                    <h3>Pack Info (en_US.lang)</h3>
+                    <p><strong>Name:</strong> ${packInfo.name || "Unknown"}</p>
+                    <p><strong>Description:</strong> ${packInfo.description || "None"}</p>
+                `;
+                packInfoBox.classList.add("visible");
 
-            zip.file(resManifest.path,JSON.stringify(resManifest.json,null,2));
-            zip.file(behManifest.path,JSON.stringify(behManifest.json,null,2));
+                // Optionally sync Lang -> manifest header
+                if (resManifest.json && resManifest.json.header) {
+                    if (packInfo.name) {
+                        resManifest.json.header.name = packInfo.name + " - Patch";
+                    }
+                    if (packInfo.description) {
+                        resManifest.json.header.description = packInfo.description + " (patched)";
+                    }
+                }
+            }
 
-            updateProgress(60,"Compressing images and audio...");
+            updateProgress(50, "Generating new UUIDs...");
+            const oldRes = resManifest.json.header.uuid;
+            const oldBeh = behManifest.json.header.uuid;
+
+            const newRes = makeUuid();
+            const newBeh = makeUuid();
+
+            const uuidMap = {
+                [oldRes]: newRes,
+                [oldBeh]: newBeh
+            };
+
+            updateManifest(resManifest.json, uuidMap);
+            updateManifest(behManifest.json, uuidMap);
+            ensureDependencies(behManifest.json, resManifest.json, newRes, newBeh);
+
+            zip.file(resManifest.path, JSON.stringify(resManifest.json, null, 2));
+            zip.file(behManifest.path, JSON.stringify(behManifest.json, null, 2));
+
+            updateProgress(60, "Optimizing images and audio...");
             await compressFiles(zip);
 
-            updateProgress(90,"Generating updated ZIP...");
-            const blob = await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:9}});
+            updateProgress(90, "Building updated archive...");
+            const blob = await zip.generateAsync({
+                type: "blob",
+                compression: "DEFLATE",
+                compressionOptions: { level: 9 }
+            });
 
-            const originalSize=file.size, finalSize=blob.size;
-            const compressionRatio=((1-finalSize/originalSize)*100).toFixed(2);
+            const originalSize = file.size;
+            const finalSize    = blob.size;
+            const compressionRatio = ((1 - finalSize / originalSize) * 100).toFixed(2);
 
-            download(blob,file.name.replace(/\.(mcaddon|zip)$/i,"_updated.$1"));
-            updateProgress(100,"Addon ready! Download starting...");
+            const newName = file.name.replace(/\.(mcaddon|zip)$/i, "_updated.$1");
+            download(blob, newName);
 
-            showSuccess("Success! Your updated addon is downloading...");
-            uuidDisplay.innerHTML = `<div class="uuid-card"><h3>RESOURCE UUID</h3><p>${newRes}</p></div>
-                                     <div class="uuid-card"><h3>BEHAVIOR UUID</h3><p>${newBeh}</p></div>`;
-            outputSection.innerHTML += `<div class="success">
-                <strong>Original Size:</strong> ${formatBytes(originalSize)}<br/>
-                <strong>Final Size:</strong> ${formatBytes(finalSize)}<br/>
-                <strong>Compression Ratio:</strong> ${compressionRatio}% saved
-            </div>`;
+            updateProgress(100, "Addon ready! Download starting...");
+            showSuccess("Success! Your patched addon is downloading.");
 
-            setTimeout(()=>progressBar.classList.remove("active"),2000);
-        }catch(e){
+            uuidDisplay.innerHTML = `
+                <div class="uuid-card">
+                    <h3>Resource UUID</h3>
+                    <p>${newRes}</p>
+                </div>
+                <div class="uuid-card">
+                    <h3>Behavior UUID</h3>
+                    <p>${newBeh}</p>
+                </div>
+            `;
+
+            const sizeSummary = document.createElement("div");
+            sizeSummary.className = "size-summary";
+            sizeSummary.innerHTML = `
+                <strong>Original size:</strong> ${formatBytes(originalSize)}<br>
+                <strong>Final size:</strong> ${formatBytes(finalSize)}<br>
+                <strong>Space saved:</strong> ${compressionRatio}% ${finalSize <= originalSize ? "smaller" : "larger"} than original
+            `;
+            outputSection.appendChild(sizeSummary);
+
+            setTimeout(() => progressBar.classList.remove("active"), 2200);
+        } catch (e) {
             console.error(e);
-            showError("Error: "+e.message);
+            showError("Error while processing addon: " + (e.message || e.toString()));
         }
     });
-
 });
 </script>
 </body>
